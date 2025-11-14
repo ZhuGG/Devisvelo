@@ -7,20 +7,58 @@ export function normalizeText(str) {
 
 export function isTableHeaderLine(line) {
   const norm = normalizeText(line);
-  const hasArticleColumn =
-    norm.includes("articles") ||
-    norm.includes("designation") ||
-    norm.includes("descript");
-  const hasQuantityColumn =
-    norm.includes("qte") ||
-    norm.includes("quantite") ||
-    norm.includes("quantité");
-  const hasPriceOrTotalColumn =
-    norm.includes("total") ||
-    norm.includes("montant") ||
-    norm.includes("pu") ||
-    norm.includes("prix");
-  return hasArticleColumn && hasQuantityColumn && hasPriceOrTotalColumn;
+  const tokens = norm.split(/\s+/).filter(Boolean);
+
+  const hasArticleColumn = tokens.some((token) =>
+    [
+      "article",
+      "articles",
+      "designation",
+      "designations",
+      "descriptif",
+      "description",
+      "libelle",
+      "libelles",
+      "libell",
+      "reference",
+      "references",
+    ].some((keyword) => token.startsWith(keyword))
+  );
+
+  const hasQuantityColumn = tokens.some((token) =>
+    ["qte", "qté", "quantite", "quantité", "quant", "nb", "nombre"].some(
+      (keyword) => token.startsWith(keyword)
+    )
+  );
+
+  const hasPriceColumn = tokens.some((token) =>
+    ["pu", "prix", "p.u", "p.u.", "unitaire"].some((keyword) =>
+      token.includes(keyword)
+    )
+  );
+
+  const hasTotalColumn = tokens.some((token) =>
+    ["total", "montant", "ttc", "ht"].some((keyword) =>
+      token.includes(keyword)
+    )
+  );
+
+  const detectedColumns = [
+    hasArticleColumn,
+    hasQuantityColumn,
+    hasPriceColumn,
+    hasTotalColumn,
+  ].filter(Boolean).length;
+
+  if (detectedColumns >= 3) {
+    return true;
+  }
+
+  return (
+    hasQuantityColumn &&
+    (hasPriceColumn || hasTotalColumn) &&
+    (hasArticleColumn || hasPriceColumn || hasTotalColumn)
+  );
 }
 
 export function isTableEndLine(line) {
