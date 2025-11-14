@@ -1,8 +1,6 @@
 import {
   buildLinesFromTextContent,
-  isTableEndLine,
-  isTableHeaderLine,
-  parseQuantityLine,
+  extractItemsFromAudaceQuote,
 } from "./pdf-parser.js";
 import { renderPreview, renderResults, renderStats, resetUi, showToast } from "./ui.js";
 
@@ -39,70 +37,17 @@ export async function analyzePdf(arrayBuffer) {
 
   await renderPreview(pdf);
 
-  const MAX_BUFFERED_LINES = 4;
-
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
     const lines = buildLinesFromTextContent(textContent);
+    const items = extractItemsFromAudaceQuote(lines);
 
-    let inTable = false;
-    let descBuffer = [];
+    state.totalRows += items.length;
 
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) {
-        continue;
-      }
-
-      const qtyInfo = parseQuantityLine(line);
-      if (qtyInfo) {
-        if (!inTable) {
-          inTable = true;
-        }
-
-        let description = descBuffer.join(" ").replace(/\s+/g, " ").trim();
-        descBuffer = [];
-
-        if (qtyInfo.description) {
-          description = qtyInfo.description;
-        }
-
-        if (!description) {
-          continue;
-        }
-
-        const previousValue = state.aggregated.get(description) || 0;
-        state.aggregated.set(description, previousValue + qtyInfo.qty);
-        state.totalRows += 1;
-        continue;
-      }
-
-      if (!inTable) {
-        if (isTableHeaderLine(line)) {
-          inTable = true;
-          descBuffer = [];
-        }
-
-        if (!inTable) {
-          if (descBuffer.length >= MAX_BUFFERED_LINES) {
-            descBuffer.shift();
-          }
-          descBuffer.push(line);
-        }
-        continue;
-      }
-
-      if (isTableEndLine(line)) {
-        inTable = false;
-        descBuffer = [];
-        continue;
-      }
-
-      if (descBuffer.length >= MAX_BUFFERED_LINES) {
-        descBuffer.shift();
-      }
-      descBuffer.push(line);
+    for (const item of items) {
+      const previousValue = state.aggregated.get(item.description) || 0;
+      state.aggregated.set(item.description, previousValue + item.qty);
     }
   }
 
