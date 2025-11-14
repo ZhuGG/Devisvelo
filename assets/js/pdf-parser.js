@@ -21,15 +21,34 @@ export function isTableEndLine(line) {
 
 export function parseQuantityLine(line) {
   const trimmed = line.trim();
-  const match = trimmed.match(/^(\d+)\s+([\d.,]+)\s+(\d+%)\s+([\d.,]+)\s*$/);
-  if (!match) {
+
+  const numericOnlyMatch = trimmed.match(/^(\d+)\s+[\d.,]+\s+\d+%\s+[\d.,]+\s*$/);
+  if (numericOnlyMatch) {
+    const qty = parseInt(numericOnlyMatch[1], 10);
+    if (qty && !Number.isNaN(qty)) {
+      return { qty };
+    }
     return null;
   }
-  const qty = parseInt(match[1], 10);
+
+  const withDescriptionMatch = trimmed.match(
+    /^(?<description>.+?)\s+(?<qty>\d+)\s+[\d.,]+\s+\d+%\s+[\d.,]+\s*$/,
+  );
+  if (!withDescriptionMatch) {
+    return null;
+  }
+
+  const qty = parseInt(withDescriptionMatch.groups.qty, 10);
   if (!qty || Number.isNaN(qty)) {
     return null;
   }
-  return { qty };
+
+  const description = withDescriptionMatch.groups.description.replace(/\s+/g, " ").trim();
+  if (!description) {
+    return null;
+  }
+
+  return { qty, description };
 }
 
 export function buildLinesFromTextContent(textContent) {

@@ -69,8 +69,11 @@ export async function analyzePdf(arrayBuffer) {
 
       const qtyInfo = parseQuantityLine(line);
       if (qtyInfo) {
-        const description = descBuffer.join(" ").replace(/\s+/g, " ").trim();
+        let description = descBuffer.join(" ").replace(/\s+/g, " ").trim();
         descBuffer = [];
+        if (qtyInfo.description) {
+          description = qtyInfo.description;
+        }
         if (!description) {
           continue;
         }
