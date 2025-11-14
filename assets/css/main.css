@@ -147,15 +147,15 @@ header .badge {
 @media (max-width: 640px) {
   header {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
+    text-align: center;
+    overflow: visible;
   }
 
   header .brand {
-    justify-content: flex-start;
-  }
-
-  header .badge {
-    align-self: flex-start;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
   }
 
   header .brand-logo {
