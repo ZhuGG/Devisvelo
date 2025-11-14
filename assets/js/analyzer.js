@@ -39,6 +39,8 @@ export async function analyzePdf(arrayBuffer) {
 
   await renderPreview(pdf);
 
+  const MAX_BUFFERED_LINES = 4;
+
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
@@ -53,10 +55,40 @@ export async function analyzePdf(arrayBuffer) {
         continue;
       }
 
+      const qtyInfo = parseQuantityLine(line);
+      if (qtyInfo) {
+        if (!inTable) {
+          inTable = true;
+        }
+
+        let description = descBuffer.join(" ").replace(/\s+/g, " ").trim();
+        descBuffer = [];
+
+        if (qtyInfo.description) {
+          description = qtyInfo.description;
+        }
+
+        if (!description) {
+          continue;
+        }
+
+        const previousValue = state.aggregated.get(description) || 0;
+        state.aggregated.set(description, previousValue + qtyInfo.qty);
+        state.totalRows += 1;
+        continue;
+      }
+
       if (!inTable) {
         if (isTableHeaderLine(line)) {
           inTable = true;
           descBuffer = [];
+        }
+
+        if (!inTable) {
+          if (descBuffer.length >= MAX_BUFFERED_LINES) {
+            descBuffer.shift();
+          }
+          descBuffer.push(line);
         }
         continue;
       }
@@ -67,22 +99,10 @@ export async function analyzePdf(arrayBuffer) {
         continue;
       }
 
-      const qtyInfo = parseQuantityLine(line);
-      if (qtyInfo) {
-        let description = descBuffer.join(" ").replace(/\s+/g, " ").trim();
-        descBuffer = [];
-        if (qtyInfo.description) {
-          description = qtyInfo.description;
-        }
-        if (!description) {
-          continue;
-        }
-        const previousValue = state.aggregated.get(description) || 0;
-        state.aggregated.set(description, previousValue + qtyInfo.qty);
-        state.totalRows += 1;
-      } else {
-        descBuffer.push(line);
+      if (descBuffer.length >= MAX_BUFFERED_LINES) {
+        descBuffer.shift();
       }
+      descBuffer.push(line);
     }
   }
 
