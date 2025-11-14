@@ -14,7 +14,7 @@
         <div class="brand-text">
           <h1>Extracteur de pièces — devis vélo (PDF)</h1>
           <p class="subtitle">
-            Dépose un PDF contenant un ou plusieurs devis. L’analyse reste locale dans ton navigateur.
+            Analyse tes devis PDF directement dans ton navigateur, sans quitter ta machine.
           </p>
         </div>
       </div>
@@ -34,8 +34,8 @@
             </div>
           </div>
           <p class="card-description">
-            Format attendu : tableau <strong>ARTICLES / QTÉ / PU / TVA / TOTAL</strong> comme dans ton exemple.
-            Chaque ligne d’article peut avoir une ou plusieurs lignes de description, suivies d’une ligne chiffrée.
+            Tableaux structurés <strong>ARTICLES / QTÉ / PU / TVA / TOTAL</strong> avec une ligne chiffrée par article,
+            même si la description s’étend sur plusieurs lignes.
           </p>
 
           <label class="drop-zone" id="dropZone">
@@ -61,7 +61,7 @@
           <div class="preview-wrapper">
             <canvas id="previewCanvas"></canvas>
             <div class="preview-caption">
-              Aperçu de la première page pour vérifier que tu as le bon document.
+              Prévisualisation de la première page pour valider le document importé.
             </div>
           </div>
         </div>
@@ -79,8 +79,8 @@
             </button>
           </div>
           <p class="card-description">
-            L’algorithme repère le bloc <strong>ARTICLES / QTÉ / PU / TVA / TOTAL</strong>,
-            reconstruit la description d’article et additionne les quantités sur l’ensemble du PDF.
+            Le moteur détecte le bloc <strong>ARTICLES / QTÉ / PU / TVA / TOTAL</strong> et consolide les quantités
+            sur tout le document.
           </p>
 
           <div class="stats-row" id="statsRow">
@@ -100,8 +100,7 @@
 
           <div id="resultsContainer">
             <div class="empty-state" id="emptyState">
-              Aucun PDF analysé pour le moment.<br />
-              Commence par déposer un devis à gauche.
+              Dépose un devis vélo pour lancer l’analyse et voir les articles agrégés ici.
             </div>
 
             <div class="results-wrapper" id="resultsWrapper">
