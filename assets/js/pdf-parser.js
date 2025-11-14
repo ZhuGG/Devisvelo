@@ -7,104 +7,215 @@ export function normalizeText(str) {
 
 export function isTableHeaderLine(line) {
   const norm = normalizeText(line);
-  return norm.includes("articles") && norm.includes("qte") && norm.includes("total");
+  const hasArticleColumn =
+    norm.includes("articles") ||
+    norm.includes("designation") ||
+    norm.includes("descript");
+  const hasQuantityColumn =
+    norm.includes("qte") ||
+    norm.includes("quantite") ||
+    norm.includes("quantité");
+  const hasPriceOrTotalColumn =
+    norm.includes("total") ||
+    norm.includes("montant") ||
+    norm.includes("pu") ||
+    norm.includes("prix");
+  return hasArticleColumn && hasQuantityColumn && hasPriceOrTotalColumn;
 }
 
 export function isTableEndLine(line) {
   const norm = normalizeText(line);
   return (
     norm.includes("total ht") ||
+    norm.includes("total ttc") ||
     norm.includes("solde total") ||
-    norm.includes("taux de tva")
+    norm.includes("taux de tva") ||
+    norm.includes("net a payer") ||
+    norm.includes("net a regler") ||
+    norm.includes("acompte") ||
+    norm.includes("total general")
   );
 }
+
+const NBSP_REGEX = /\u00a0/g;
+const MULTISPACE_REGEX = /\s+/g;
+const MONEY_SEGMENT_REGEX =
+  /(?<value>(?:\d[\d\s.,]*\d|\d)(?:\s?(?:€|eur|euros?|€\s*ttc|€\s*ht|€ttc|€ht|ttc|ht|t\.t\.c\.?|h\.t\.?))?)$/i;
+const MONEY_WITH_MARKER_REGEX =
+  /(?<value>(?:\d[\d\s.,]*\d|\d)(?:\s?(?:€|eur|euros?|€\s*ttc|€\s*ht|€ttc|€ht|ttc|ht|t\.t\.c\.?|h\.t\.?)))$/i;
+const PERCENT_SEGMENT_REGEX =
+  /(?<value>(?:\d[\d\s.,]*\s*%?)|-|np|nr|neant|néant|exon[ée]r[ée]|autoliquidation)$/i;
+const UNIT_LABEL_REGEX =
+  /(?<label>(?:p(?:i[eè]ce|cs|ce|ces)|pcs|piece|pieces|u|unite|unité|lot|lots|set|sets?|kit|kits?)s?)$/i;
+const QTY_REGEX = /(?<qty>\d[\d\s.,]*)$/;
+const PERCENT_KEYWORDS = new Set(["-", "np", "nr", "neant", "néant", "autoliquidation"]);
 
 function sanitizeNumber(rawValue) {
   if (!rawValue) {
     return NaN;
   }
-  return Number.parseFloat(
-    rawValue
-      .replace(/€/g, "")
-      .replace(/\s+/g, "")
-      .replace(/,/g, "."),
-  );
+  const cleaned = rawValue
+    .toString()
+    .replace(/[€]/gi, "")
+    .replace(/\b(?:eur|euros?|ttc|ht|t\.t\.c\.?|h\.t\.?)\b/gi, "")
+    .replace(NBSP_REGEX, " ")
+    .replace(MULTISPACE_REGEX, "")
+    .replace(/,/g, ".");
+  return Number.parseFloat(cleaned);
 }
 
-function extractLineSegments(line) {
-  let rest = line.replace(/\u00a0/g, " ").trim();
+function popTrailingSegment(source, regex) {
+  const match = source.match(regex);
+  if (!match) {
+    return [null, source];
+  }
+  const consumed = (match.groups && (match.groups.value || match.groups.label)) || match[0];
+  const next = source.slice(0, -match[0].length).trim();
+  return [consumed.trim(), next];
+}
 
-  if (!rest) {
-    return null;
+function pushLine(lines, parts) {
+  if (!parts || parts.length === 0) {
+    return;
+  }
+  const joined = parts.join(" ").replace(MULTISPACE_REGEX, " ").trim();
+  if (joined) {
+    lines.push(joined);
+  }
+  parts.length = 0;
+}
+
+export function buildLinesFromTextContent(textContent) {
+  const lines = [];
+  let currentParts = [];
+  let currentBaseline = null;
+
+  for (const item of textContent.items) {
+    if (!item.str) {
+      continue;
+    }
+
+    const text = item.str.replace(NBSP_REGEX, " ").replace(MULTISPACE_REGEX, " ").trim();
+    if (!text) {
+      continue;
+    }
+
+    const baseline = item.transform ? item.transform[5] : null;
+    const height = item.height || (item.transform ? Math.abs(item.transform[3]) : 0);
+    const tolerance = Math.max(2, (height || 9) * 0.6);
+
+    if (currentBaseline === null && baseline !== null) {
+      currentBaseline = baseline;
+    }
+
+    if (
+      currentParts.length > 0 &&
+      baseline !== null &&
+      currentBaseline !== null &&
+      Math.abs(baseline - currentBaseline) > tolerance
+    ) {
+      pushLine(lines, currentParts);
+      currentBaseline = baseline;
+    }
+
+    currentParts.push(text);
+
+    if (item.hasEOL) {
+      pushLine(lines, currentParts);
+      currentBaseline = null;
+    }
   }
 
-  const totalMatch = rest.match(/(?<total>(?:\d[\d\s.,]*\d|\d)(?:\s?€)?)$/);
-  if (!totalMatch) {
+  pushLine(lines, currentParts);
+  return lines;
+}
+
+function tryParseQuantityLine(cleanLine, removeExtraTotals) {
+  let rest = cleanLine;
+
+  const [total, afterTotal] = popTrailingSegment(rest, MONEY_SEGMENT_REGEX);
+  if (!total) {
     return null;
   }
-  rest = rest.slice(0, -totalMatch[0].length).trim();
+  rest = afterTotal;
 
-  const tvaMatch = rest.match(/(?<tva>\d[\d\s.,]*\s*%|-|exon[ée]r[ée])$/i);
-  if (!tvaMatch) {
+  if (removeExtraTotals) {
+    for (let i = 0; i < 2; i += 1) {
+      const [candidate, nextRest] = popTrailingSegment(rest, MONEY_WITH_MARKER_REGEX);
+      if (!candidate) {
+        break;
+      }
+      rest = nextRest;
+    }
+  }
+
+  let percentCount = 0;
+  while (percentCount < 2) {
+    const match = rest.match(PERCENT_SEGMENT_REGEX);
+    if (!match) {
+      break;
+    }
+    const candidate = (match.groups && match.groups.value ? match.groups.value : match[0]).trim();
+    const lowerCandidate = candidate.toLowerCase();
+    let keep = false;
+    if (lowerCandidate.includes("%") || lowerCandidate.startsWith("exon")) {
+      keep = true;
+    } else if (PERCENT_KEYWORDS.has(lowerCandidate)) {
+      keep = true;
+    } else if (/^\d[\d\s.,]*$/.test(candidate)) {
+      const numericValue = Number.parseFloat(candidate.replace(/\s+/g, "").replace(/,/g, "."));
+      if (Number.isFinite(numericValue) && numericValue <= 100) {
+        keep = true;
+      }
+    }
+
+    if (!keep) {
+      break;
+    }
+
+    rest = rest.slice(0, -match[0].length).trim();
+    percentCount += 1;
+  }
+
+  const [unitCandidate, afterUnit] = popTrailingSegment(rest, MONEY_SEGMENT_REGEX);
+  if (!unitCandidate) {
     return null;
   }
-  rest = rest.slice(0, -tvaMatch[0].length).trim();
+  rest = afterUnit;
 
-  const unitMatch = rest.match(/(?<unit>(?:\d[\d\s.,]*\d|\d)(?:\s?€)?)$/);
-  if (!unitMatch) {
-    return null;
+  const [unitLabel, afterLabel] = popTrailingSegment(rest, UNIT_LABEL_REGEX);
+  if (unitLabel) {
+    rest = afterLabel;
   }
-  rest = rest.slice(0, -unitMatch[0].length).trim();
 
-  const qtyMatch = rest.match(/(?<qty>\d[\d\s.,]*)$/);
+  if (/([xX])$/.test(rest)) {
+    rest = rest.slice(0, -1).trim();
+  }
+
+  const qtyMatch = rest.match(QTY_REGEX);
   if (!qtyMatch) {
     return null;
   }
   rest = rest.slice(0, -qtyMatch[0].length).trim();
 
-  return {
-    qty: sanitizeNumber(qtyMatch[0]),
-    description: rest || null,
-  };
+  const qty = sanitizeNumber(qtyMatch.groups.qty);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return null;
+  }
+
+  const description = rest.replace(MULTISPACE_REGEX, " ").trim();
+  if (description) {
+    return { qty, description };
+  }
+
+  return { qty };
 }
 
 export function parseQuantityLine(line) {
-  const segments = extractLineSegments(line);
-  if (!segments) {
+  const cleanLine = line.replace(NBSP_REGEX, " ").replace(MULTISPACE_REGEX, " ").trim();
+  if (!cleanLine) {
     return null;
   }
 
-  if (!Number.isFinite(segments.qty) || segments.qty <= 0) {
-    return null;
-  }
-
-  if (segments.description) {
-    const description = segments.description.replace(/\s+/g, " ").trim();
-    if (!description) {
-      return null;
-    }
-    return { qty: segments.qty, description };
-  }
-
-  return { qty: segments.qty };
-}
-
-export function buildLinesFromTextContent(textContent) {
-  const lines = [];
-  let currentLine = "";
-  for (const item of textContent.items) {
-    if (!item.str) {
-      continue;
-    }
-    const text = item.str;
-    currentLine += (currentLine ? " " : "") + text;
-    if (item.hasEOL) {
-      lines.push(currentLine.trim());
-      currentLine = "";
-    }
-  }
-  if (currentLine.trim()) {
-    lines.push(currentLine.trim());
-  }
-  return lines;
+  return tryParseQuantityLine(cleanLine, true) ?? tryParseQuantityLine(cleanLine, false);
 }
