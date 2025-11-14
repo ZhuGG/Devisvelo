@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Extracteur de pièces – Devis vélo (PDF)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <div>
+        <h1>Extracteur de pièces — devis vélo (PDF)</h1>
+        <p class="subtitle">
+          Dépose un PDF contenant un ou plusieurs devis. L’analyse reste locale dans ton navigateur.
+        </p>
+      </div>
+      <div class="badge">
+        <span class="badge-dot"></span>
+        <span>Local • Offline</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="card-content">
+          <div class="card-header">
+            <div>
+              <div class="card-kicker">Étape 1</div>
+              <div class="card-title">Déposer le PDF de devis</div>
+            </div>
+          </div>
+          <p class="card-description">
+            Format attendu : tableau <strong>ARTICLES / QTÉ / PU / TVA / TOTAL</strong> comme dans ton exemple.
+            Chaque ligne d’article peut avoir une ou plusieurs lignes de description, suivies d’une ligne chiffrée.
+          </p>
+
+          <label class="drop-zone" id="dropZone">
+            <div class="drop-icon">📄</div>
+            <div class="drop-title">Glisse ton fichier PDF ici</div>
+            <div class="drop-subtitle">
+              ou clique pour le sélectionner<br />
+              <span class="drop-subtitle-note">
+                Un seul PDF à la fois (plusieurs pages possibles).
+              </span>
+            </div>
+            <button type="button" class="btn btn-secondary" id="browseButton">
+              Parcourir…
+            </button>
+            <input
+              type="file"
+              class="file-input"
+              id="fileInput"
+              accept="application/pdf"
+            />
+          </label>
+
+          <div class="preview-wrapper">
+            <canvas id="previewCanvas"></canvas>
+            <div class="preview-caption">
+              Aperçu de la première page pour vérifier que tu as le bon document.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-content">
+          <div class="card-header card-header--spaced">
+            <div>
+              <div class="card-kicker">Étape 2</div>
+              <div class="card-title">Récapitulatif des pièces extraites</div>
+            </div>
+            <button class="btn" id="exportButton" disabled>
+              Exporter en CSV
+            </button>
+          </div>
+          <p class="card-description">
+            L’algorithme repère le bloc <strong>ARTICLES / QTÉ / PU / TVA / TOTAL</strong>,
+            reconstruit la description d’article et additionne les quantités sur l’ensemble du PDF.
+          </p>
+
+          <div class="stats-row" id="statsRow">
+            <div class="stat-pill">
+              Pages analysées :
+              <span class="value" id="statPages">0</span>
+            </div>
+            <div class="stat-pill">
+              Lignes trouvées :
+              <span class="value" id="statRows">0</span>
+            </div>
+            <div class="stat-pill">
+              Articles uniques :
+              <span class="value" id="statItems">0</span>
+            </div>
+          </div>
+
+          <div id="resultsContainer">
+            <div class="empty-state" id="emptyState">
+              Aucun PDF analysé pour le moment.<br />
+              Commence par déposer un devis à gauche.
+            </div>
+
+            <div class="results-wrapper" id="resultsWrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Article</th>
+                    <th class="qty-header">Quantité totale</th>
+                  </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      v1 — Lecture PDF côté client avec PDF.js. Pensé pour les devis type Ateliers de l’audace.
+    </footer>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
