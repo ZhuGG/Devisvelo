@@ -8,6 +8,7 @@ const elements = {
   statPages: document.getElementById("statPages"),
   statRows: document.getElementById("statRows"),
   statItems: document.getElementById("statItems"),
+  statsNote: document.getElementById("statsNote"),
   emptyState: document.getElementById("emptyState"),
   resultsState: document.getElementById("resultsState"),
   resultsContext: document.getElementById("resultsContext"),
@@ -26,6 +27,7 @@ const STATUS_ICONS = {
 };
 
 const ANALYSIS_STATES = ["idle", "loading", "success", "error"];
+const EMPTY_STATS_NOTE = "Aucun article trouvé.";
 
 export function showToast(message, isError = false) {
   const { toastEl } = elements;
@@ -72,6 +74,7 @@ export function resetUi() {
     statRows,
     statItems,
     statsRow,
+    statsNote,
     emptyState,
     resultsState,
     resultsContext,
@@ -86,6 +89,8 @@ export function resetUi() {
   statRows.textContent = "0";
   statItems.textContent = "0";
   statsRow.style.display = "none";
+  statsNote.classList.remove("is-visible");
+  statsNote.textContent = EMPTY_STATS_NOTE;
   emptyState.style.display = "flex";
   resultsState.style.display = "none";
   resultsState.classList.remove("is-visible");
@@ -102,16 +107,26 @@ export function resetUi() {
   previewCanvas.style.width = "";
 }
 
-export function renderStats({ pagesAnalyzed, totalRows, uniqueArticles }) {
-  const { statsRow, statPages, statRows, statItems } = elements;
-  if (!pagesAnalyzed || !uniqueArticles) {
+export function renderStats({ pagesAnalyzed = 0, totalRows = 0, uniqueArticles = 0 }) {
+  const { statsRow, statPages, statRows, statItems, statsNote } = elements;
+  if (!pagesAnalyzed) {
     statsRow.style.display = "none";
+    statsNote.classList.remove("is-visible");
+    statsNote.textContent = EMPTY_STATS_NOTE;
     return;
   }
   statsRow.style.display = "flex";
   statPages.textContent = String(pagesAnalyzed);
   statRows.textContent = String(totalRows);
   statItems.textContent = String(uniqueArticles);
+
+  if (uniqueArticles === 0) {
+    statsNote.textContent = EMPTY_STATS_NOTE;
+    statsNote.classList.add("is-visible");
+  } else {
+    statsNote.textContent = "";
+    statsNote.classList.remove("is-visible");
+  }
 }
 
 export function renderResults(aggregated) {
