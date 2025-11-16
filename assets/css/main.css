@@ -455,6 +455,7 @@ main {
   gap: 8px;
   margin-top: 12px;
   font-size: 0.78rem;
+  align-items: center;
 }
 
 .stat-pill {
@@ -471,6 +472,17 @@ main {
 .stat-pill span.value {
   color: var(--accent);
   font-weight: 600;
+}
+
+.stats-note {
+  margin-left: auto;
+  font-style: italic;
+  color: var(--danger);
+  display: none;
+}
+
+.stats-note.is-visible {
+  display: block;
 }
 
 .results-wrapper {
