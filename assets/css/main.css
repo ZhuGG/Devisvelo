@@ -298,15 +298,24 @@ main {
     transform 0.12s ease, box-shadow 0.18s ease;
   backdrop-filter: blur(3px);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  text-align: center;
+  position: relative;
 }
 
-.drop-zone.is-dragover {
+.drop-zone.is-drag-over {
   border-color: var(--accent);
   background:
     radial-gradient(circle at top, rgba(255, 122, 28, 0.18) 0%, transparent 60%),
     linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(244, 246, 255, 1) 100%);
   transform: translateY(-1px);
   box-shadow: 0 18px 36px rgba(28, 63, 170, 0.18);
+}
+
+.drop-zone.is-loading {
+  border-style: solid;
+  border-color: rgba(28, 63, 170, 0.35);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+  cursor: progress;
 }
 
 .drop-icon {
@@ -320,6 +329,7 @@ main {
   color: #fff;
   box-shadow: 0 12px 24px rgba(255, 122, 28, 0.35);
   font-size: 1.35rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .drop-title {
@@ -332,6 +342,57 @@ main {
   font-size: 0.8rem;
   color: var(--ink-soft);
   text-align: center;
+}
+
+.drop-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drop-copy--drag,
+.drop-copy--loading {
+  display: none;
+}
+
+.drop-zone.is-drag-over .drop-copy--default,
+.drop-zone.is-loading .drop-copy--default {
+  display: none;
+}
+
+.drop-zone.is-drag-over .drop-copy--drag {
+  display: flex;
+}
+
+.drop-zone.is-drag-over .drop-icon {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 18px 40px rgba(255, 122, 28, 0.45);
+}
+
+.drop-zone.is-loading .drop-copy--loading {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+}
+
+.drop-zone.is-loading .drop-icon {
+  opacity: 0.4;
+}
+
+.drop-loader {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid rgba(28, 63, 170, 0.2);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .file-input {
@@ -473,14 +534,22 @@ tbody tr:last-child td {
 }
 
 .empty-state {
-  margin-top: 20px;
-  padding: 18px 14px;
-  border-radius: 14px;
+  margin-top: 12px;
+  padding: 24px 18px;
+  border-radius: 16px;
   border: 1.5px dashed rgba(28, 63, 170, 0.26);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.9);
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--ink-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.empty-illustration {
+  font-size: 2rem;
 }
 
 .toast {
@@ -547,10 +616,6 @@ canvas {
   display: none;
 }
 
-.results-wrapper {
-  display: none;
-}
-
 .qty-header {
   text-align: right;
 }
@@ -564,3 +629,82 @@ canvas {
   opacity: 0.8;
   color: var(--ink-muted);
 }
+
+.drop-status {
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid transparent;
+  background: rgba(15, 23, 42, 0.03);
+  color: var(--ink);
+}
+
+.drop-status[aria-hidden="true"] {
+  display: none;
+}
+
+.status-icon {
+  font-size: 1rem;
+}
+
+.status--info {
+  border-color: rgba(28, 63, 170, 0.2);
+  background: rgba(28, 63, 170, 0.08);
+}
+
+.status--error {
+  border-color: rgba(223, 59, 87, 0.35);
+  background: rgba(223, 59, 87, 0.08);
+  color: #6b1021;
+}
+
+.status--success {
+  border-color: rgba(34, 197, 94, 0.25);
+  background: rgba(16, 185, 129, 0.1);
+  color: #065f46;
+}
+
+.results-state {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.results-state.is-visible {
+  display: flex;
+}
+
+.results-context {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(28, 63, 170, 0.08);
+  border: 1px solid rgba(28, 63, 170, 0.15);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.results-context-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+body.analysis-loading .drop-zone {
+  outline: 3px solid rgba(28, 63, 170, 0.15);
+}
+
+body.analysis-error .drop-zone {
+  border-color: rgba(223, 59, 87, 0.5);
+}
+
+body.analysis-success .drop-zone {
+  border-color: rgba(34, 197, 94, 0.5);
+}
+

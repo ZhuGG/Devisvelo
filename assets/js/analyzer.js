@@ -5,6 +5,7 @@ const state = {
   aggregated: new Map(),
   totalRows: 0,
   pagesAnalyzed: 0,
+  hasReadableText: false,
 };
 
 let pdfjsLib;
@@ -17,6 +18,7 @@ export function resetAnalysis() {
   state.aggregated.clear();
   state.totalRows = 0;
   state.pagesAnalyzed = 0;
+  state.hasReadableText = false;
   resetUi();
 }
 
@@ -37,7 +39,13 @@ export async function analyzePdf(arrayBuffer) {
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
+    if (textContent?.items?.length) {
+      state.hasReadableText = true;
+    }
     const lines = buildLinesFromTextContent(textContent);
+    if (lines.length > 0) {
+      state.hasReadableText = true;
+    }
 
     if (window.DEBUG_PDF) {
       console.group("LIGNES PDF");
@@ -78,6 +86,7 @@ export async function analyzePdf(arrayBuffer) {
     pagesAnalyzed: state.pagesAnalyzed,
     totalRows: state.totalRows,
     aggregated: new Map(state.aggregated),
+    hasReadableText: state.hasReadableText,
   };
 }
 

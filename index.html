@@ -31,14 +31,33 @@
             </div>
           </div>
 
-          <label class="drop-zone" id="dropZone">
-            <div class="drop-icon">📄</div>
-            <div class="drop-title">Glisse ton fichier PDF ici</div>
-            <div class="drop-subtitle">
-              ou clique pour le sélectionner<br />
-              <span class="drop-subtitle-note">
-                Un seul PDF à la fois (plusieurs pages possibles).
-              </span>
+          <label
+            class="drop-zone"
+            id="dropZone"
+            tabindex="0"
+            role="button"
+            aria-label="Déposer un devis PDF pour analyser les articles"
+          >
+            <div class="drop-icon" aria-hidden="true">📄</div>
+            <div class="drop-copy drop-copy--default">
+              <div class="drop-title">Dépose ton devis PDF ici</div>
+              <div class="drop-subtitle">
+                Le fichier reste sur ton ordinateur. Analyse 100 % locale.
+              </div>
+              <div class="drop-subtitle-note">
+                ou clique pour le sélectionner — un seul PDF à la fois.
+              </div>
+            </div>
+            <div class="drop-copy drop-copy--drag">
+              <div class="drop-title">Relâche pour lancer l’analyse du devis</div>
+              <div class="drop-subtitle">L’import est instantané et reste local.</div>
+            </div>
+            <div class="drop-copy drop-copy--loading">
+              <div class="drop-loader" role="presentation"></div>
+              <div>
+                <div class="drop-title">Analyse du devis en cours…</div>
+                <div class="drop-subtitle">Patiente quelques secondes.</div>
+              </div>
             </div>
             <button type="button" class="btn btn-secondary" id="browseButton">
               Parcourir…
@@ -50,6 +69,14 @@
               accept="application/pdf"
             />
           </label>
+          <div
+            class="drop-status"
+            id="dropStatus"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-hidden="true"
+          ></div>
 
           <div class="preview-wrapper">
             <canvas id="previewCanvas"></canvas>
@@ -89,19 +116,32 @@
 
           <div id="resultsContainer">
             <div class="empty-state" id="emptyState">
-              Dépose un devis vélo pour lancer l’analyse et voir les articles agrégés ici.
+              <div class="empty-illustration" aria-hidden="true">🛠️</div>
+              <h3>Aucun devis analysé pour le moment</h3>
+              <p>Dépose un PDF à gauche pour voir ici les articles détectés.</p>
             </div>
 
-            <div class="results-wrapper" id="resultsWrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Article</th>
-                    <th class="qty-header">Quantité totale</th>
-                  </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-              </table>
+            <div class="results-state" id="resultsState">
+              <div class="results-context" id="resultsContext">
+                <span class="results-context-icon" aria-hidden="true">ℹ️</span>
+                <p>
+                  Les lignes sont interprétées à partir du tableau ARTICLES / QTÉ / PU /
+                  TVA / TOTAL. Si un article manque ou semble incorrect, vérifie le format
+                  du devis.
+                </p>
+              </div>
+
+              <div class="results-wrapper" id="resultsWrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Article</th>
+                      <th class="qty-header">Quantité totale</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultsBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

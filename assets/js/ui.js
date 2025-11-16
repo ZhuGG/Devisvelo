@@ -9,12 +9,23 @@ const elements = {
   statRows: document.getElementById("statRows"),
   statItems: document.getElementById("statItems"),
   emptyState: document.getElementById("emptyState"),
+  resultsState: document.getElementById("resultsState"),
+  resultsContext: document.getElementById("resultsContext"),
   resultsWrapper: document.getElementById("resultsWrapper"),
   resultsBody: document.getElementById("resultsBody"),
+  dropStatus: document.getElementById("dropStatus"),
   toastEl: document.getElementById("toast"),
 };
 
 export { elements };
+
+const STATUS_ICONS = {
+  info: "ℹ️",
+  error: "⚠️",
+  success: "✅",
+};
+
+const ANALYSIS_STATES = ["idle", "loading", "success", "error"];
 
 export function showToast(message, isError = false) {
   const { toastEl } = elements;
@@ -26,6 +37,35 @@ export function showToast(message, isError = false) {
   }, 2800);
 }
 
+export function showStatus(type, message) {
+  const { dropStatus } = elements;
+  if (!type || !message) {
+    dropStatus.textContent = "";
+    dropStatus.className = "drop-status";
+    dropStatus.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  const icon = STATUS_ICONS[type] || STATUS_ICONS.info;
+  dropStatus.innerHTML = `
+    <span class="status-icon" aria-hidden="true">${icon}</span>
+    <span>${message}</span>
+  `;
+  dropStatus.className = `drop-status status--${type}`;
+  dropStatus.removeAttribute("aria-hidden");
+}
+
+export function setAnalysisState(state) {
+  const { dropZone, browseButton } = elements;
+  const normalizedState = ANALYSIS_STATES.includes(state) ? state : "idle";
+  ANALYSIS_STATES.forEach((key) => {
+    document.body.classList.toggle(`analysis-${key}`, key === normalizedState);
+  });
+  dropZone.classList.toggle("is-loading", normalizedState === "loading");
+  dropZone.setAttribute("aria-busy", normalizedState === "loading" ? "true" : "false");
+  browseButton.disabled = normalizedState === "loading";
+}
+
 export function resetUi() {
   const {
     statPages,
@@ -33,17 +73,23 @@ export function resetUi() {
     statItems,
     statsRow,
     emptyState,
+    resultsState,
+    resultsContext,
     resultsWrapper,
     resultsBody,
     exportButton,
     previewCanvas,
   } = elements;
 
+  document.body.classList.remove("has-results");
   statPages.textContent = "0";
   statRows.textContent = "0";
   statItems.textContent = "0";
   statsRow.style.display = "none";
-  emptyState.style.display = "block";
+  emptyState.style.display = "flex";
+  resultsState.style.display = "none";
+  resultsState.classList.remove("is-visible");
+  resultsContext.style.display = "none";
   resultsWrapper.style.display = "none";
   resultsBody.innerHTML = "";
   exportButton.disabled = true;
@@ -58,7 +104,7 @@ export function resetUi() {
 
 export function renderStats({ pagesAnalyzed, totalRows, uniqueArticles }) {
   const { statsRow, statPages, statRows, statItems } = elements;
-  if (!pagesAnalyzed) {
+  if (!pagesAnalyzed || !uniqueArticles) {
     statsRow.style.display = "none";
     return;
   }
@@ -69,9 +115,23 @@ export function renderStats({ pagesAnalyzed, totalRows, uniqueArticles }) {
 }
 
 export function renderResults(aggregated) {
-  const { emptyState, resultsWrapper, resultsBody, exportButton } = elements;
-  if (!aggregated || aggregated.size === 0) {
-    emptyState.style.display = "block";
+  const {
+    emptyState,
+    resultsWrapper,
+    resultsState,
+    resultsContext,
+    resultsBody,
+    exportButton,
+  } = elements;
+  const hasResults = Boolean(aggregated && aggregated.size > 0);
+
+  document.body.classList.toggle("has-results", hasResults);
+
+  if (!hasResults) {
+    emptyState.style.display = "flex";
+    resultsState.style.display = "none";
+    resultsState.classList.remove("is-visible");
+    resultsContext.style.display = "none";
     resultsWrapper.style.display = "none";
     resultsBody.innerHTML = "";
     exportButton.disabled = true;
@@ -79,6 +139,9 @@ export function renderResults(aggregated) {
   }
 
   emptyState.style.display = "none";
+  resultsState.style.display = "flex";
+  resultsState.classList.add("is-visible");
+  resultsContext.style.display = "flex";
   resultsWrapper.style.display = "block";
   exportButton.disabled = false;
 
