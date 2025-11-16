@@ -1,7 +1,4 @@
-import {
-  buildLinesFromTextContent,
-  extractItemsFromAudaceQuote,
-} from "./pdf-parser.js";
+import { buildLinesFromTextContent, extractItemsFromLines } from "./pdf-parser.js";
 import { renderPreview, renderResults, renderStats, resetUi, showToast } from "./ui.js";
 
 const state = {
@@ -41,7 +38,20 @@ export async function analyzePdf(arrayBuffer) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
     const lines = buildLinesFromTextContent(textContent);
-    const items = extractItemsFromAudaceQuote(lines);
+
+    if (window.DEBUG_PDF) {
+      console.group("LIGNES PDF");
+      lines.forEach((l, idx) => console.log(idx, JSON.stringify(l)));
+      console.groupEnd();
+    }
+
+    const items = extractItemsFromLines(lines);
+
+    if (window.DEBUG_PDF) {
+      console.group("ARTICLES PARSÉS");
+      console.table(items);
+      console.groupEnd();
+    }
 
     state.totalRows += items.length;
 
