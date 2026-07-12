@@ -1,163 +1,84 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <title>Extracteur de pièces – Coucou Max</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="assets/css/main.css" />
-</head>
-<body>
-  <div class="app-shell">
-    <header>
-      <div class="brand">
-        <img src="logo.webp" alt="Devis Vélo" class="brand-logo" />
-        <div class="brand-text">
-          <h1>Extracteur de pièces — Coucou Max</h1>
-        </div>
-      </div>
-      <div class="badge">
-        <span class="badge-dot"></span>
-        <span>Local • Offline</span>
-      </div>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#11251f" />
+    <title>Devis Vélo — lecteur de pièces</title>
+    <link rel="stylesheet" href="assets/css/main.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="L'Atelier de l'Udcée, accueil">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span></span>
+          <span>L'ATELIER<br /><em>DE L'UDCÉE</em></span>
+        </a>
+        <div class="privacy-note"><span class="pulse" aria-hidden="true"></span>Vos devis ne quittent jamais cet appareil</div>
+      </header>
 
-    <main>
-      <section class="card">
-        <div class="card-content">
-          <div class="card-header">
-            <div>
-              <div class="card-kicker">Étape 1</div>
-              <div class="card-title">Déposer le PDF de devis</div>
+      <main id="top">
+        <section class="hero" aria-labelledby="page-title">
+          <div class="hero-logo-lockup">
+            <img src="assets/teliero-logo.png" alt="Logo L'Atelier de l'Udcée" class="hero-logo" />
+            <div class="hero-title-block">
+              <p class="eyebrow">Le bureau des pièces</p>
+              <h1 id="page-title">Inventaire<br /><i>devis atelier</i></h1>
             </div>
           </div>
-
-          <label
-            class="drop-zone"
-            id="dropZone"
-            tabindex="0"
-            role="button"
-            aria-label="Déposer un devis PDF pour analyser les articles"
-          >
-            <div class="drop-icon" aria-hidden="true">📄</div>
-            <div class="drop-copy drop-copy--default">
-              <div class="drop-title">Dépose ton devis PDF ici</div>
-              <div class="drop-subtitle">
-                Le fichier reste sur ton ordinateur. Analyse 100 % locale.
-              </div>
-              <div class="drop-subtitle-note">
-                ou clique pour le sélectionner — un seul PDF à la fois.
-              </div>
-            </div>
-            <div class="drop-copy drop-copy--drag">
-              <div class="drop-title">Relâche pour lancer l’analyse du devis</div>
-              <div class="drop-subtitle">L’import est instantané et reste local.</div>
-            </div>
-            <div class="drop-copy drop-copy--loading">
-              <div class="drop-loader" role="presentation"></div>
-              <div>
-                <div class="drop-title">Analyse du devis en cours…</div>
-                <div class="drop-subtitle">Patiente quelques secondes.</div>
-              </div>
-            </div>
-            <button type="button" class="btn btn-secondary" id="browseButton">
-              Parcourir…
-            </button>
-            <input
-              type="file"
-              class="file-input"
-              id="fileInput"
-              accept="application/pdf"
-            />
-          </label>
-          <div
-            class="drop-status"
-            id="dropStatus"
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            aria-hidden="true"
-          ></div>
-
-          <div class="preview-wrapper">
-            <canvas id="previewCanvas"></canvas>
-            <div class="preview-caption">
-              Prévisualisation de la première page pour valider le document importé.
-            </div>
+          <div class="process" aria-label="Étapes de traitement">
+            <span><b>01</b>Importer</span><span><b>02</b>Contrôler</span><span><b>03</b>Exporter</span>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="card">
-        <div class="card-content">
-          <div class="card-header card-header--spaced">
-            <div>
-              <div class="card-kicker">Étape 2</div>
-              <div class="card-title">Récapitulatif des pièces extraites</div>
+        <section class="workspace" aria-label="Espace d'analyse">
+          <aside class="import-panel">
+            <div class="panel-label"><span>01</span> Document source</div>
+            <label class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="Choisir un devis PDF">
+              <input id="fileInput" type="file" accept="application/pdf" />
+              <span class="upload-orbit" aria-hidden="true">↗</span>
+              <span class="upload-title">Glissez votre devis ici</span>
+              <span class="upload-copy">PDF, une ou plusieurs pages</span>
+              <button class="button button-quiet" id="browseButton" type="button">Choisir un fichier</button>
+            </label>
+            <div class="file-card" id="fileCard" hidden>
+              <span class="file-icon" aria-hidden="true">PDF</span>
+              <div><strong id="fileName">—</strong><small id="fileMeta">—</small></div>
+              <button id="resetButton" class="icon-button" type="button" aria-label="Retirer le fichier">×</button>
             </div>
-            <button class="btn" id="exportButton" disabled>
-              Exporter en CSV
-            </button>
-          </div>
-
-          <div class="stats-row" id="statsRow">
-            <div class="stat-pill">
-              Pages analysées :
-              <span class="value" id="statPages">0</span>
+            <div id="dropStatus" class="status" role="status" aria-live="polite"></div>
+            <div class="preview-frame" id="previewFrame" hidden>
+              <canvas id="previewCanvas"></canvas>
+              <span>aperçu · page 1</span>
             </div>
-            <div class="stat-pill">
-              Lignes trouvées :
-              <span class="value" id="statRows">0</span>
+          </aside>
+
+          <section class="results-panel" aria-labelledby="results-title">
+            <div class="results-heading">
+              <div><div class="panel-label"><span>02</span> Inventaire détecté</div><h2 id="results-title">Prêt pour l’atelier</h2></div>
+              <div class="results-actions"><button class="button button-quiet" id="copyButton" disabled>Copier</button><button class="button" id="exportButton" disabled>Exporter CSV <span aria-hidden="true">↓</span></button></div>
             </div>
-            <div class="stat-pill">
-              Articles uniques :
-              <span class="value" id="statItems">0</span>
+            <div class="metrics" id="statsRow" hidden>
+              <div><b id="statPages">0</b><span>pages lues</span></div>
+              <div><b id="statRows">0</b><span>lignes retenues</span></div>
+              <div><b id="statItems">0</b><span>références</span></div>
             </div>
-            <div class="stats-note" id="statsNote" role="status" aria-live="polite">
-              Aucun article trouvé.
+            <div class="inventory-controls" id="inventoryControls" hidden>
+              <label class="inventory-search" for="inventorySearch"><span>Rechercher une pièce</span><input id="inventorySearch" type="search" placeholder="Désignation…" autocomplete="off" /></label>
+              <label class="inventory-sort" for="inventorySort"><span>Trier</span><select id="inventorySort"><option value="source">Ordre du devis</option><option value="name">Nom A–Z</option><option value="quantity">Quantité décroissante</option></select></label>
+              <p class="visible-count" id="visibleCount" aria-live="polite"></p>
             </div>
-          </div>
-
-          <div id="resultsContainer">
-            <div class="empty-state" id="emptyState">
-              <div class="empty-illustration" aria-hidden="true">🛠️</div>
-              <h3>Aucun devis analysé pour le moment</h3>
-              <p>Dépose un PDF à gauche pour voir ici les articles détectés.</p>
+            <div class="diagnostics" id="diagnostics" hidden></div>
+            <div class="empty-state" id="emptyState"><span aria-hidden="true">⌁</span><h3>Votre inventaire apparaîtra ici.</h3><p>Le contrôle de lecture vous indique aussi les pages qui demandent votre attention.</p></div>
+            <div class="results-state" id="resultsState" hidden>
+              <div class="table-wrap"><table><thead><tr><th>Pièce / désignation</th><th>Qté</th><th>Pages</th></tr></thead><tbody id="resultsBody"></tbody></table></div>
             </div>
-
-            <div class="results-state" id="resultsState">
-              <div class="results-context" id="resultsContext">
-                <span class="results-context-icon" aria-hidden="true">ℹ️</span>
-                <p>
-                  Les lignes sont interprétées à partir du tableau ARTICLES / QTÉ / PU /
-                  TVA / TOTAL. Si un article manque ou semble incorrect, vérifie le format
-                  du devis.
-                </p>
-              </div>
-
-              <div class="results-wrapper" id="resultsWrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Article</th>
-                      <th class="qty-header">Quantité totale</th>
-                    </tr>
-                  </thead>
-                  <tbody id="resultsBody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      v1 — Lecture PDF côté client avec PDF.js.
-    </footer>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script type="module" src="./assets/js/main.js"></script>
-</body>
+          </section>
+        </section>
+      </main>
+      <footer><span>Lecture locale par PDF.js</span><span>Atelier de l’Udcée · gestion des pièces</span></footer>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="assets/js/main.js"></script>
+  </body>
 </html>

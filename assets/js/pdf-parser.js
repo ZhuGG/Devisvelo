@@ -1,171 +1,97 @@
 const NBSP_REGEX = /\u00a0/g;
 const MULTISPACE_REGEX = /\s+/g;
-
-function pushLine(lines, parts) {
-  if (!parts || parts.length === 0) {
-    return;
-  }
-  const joined = parts.join(" ").replace(MULTISPACE_REGEX, " ").trim();
-  if (joined) {
-    lines.push(joined);
-  }
-  parts.length = 0;
-}
+const HEADER_REGEX = /(?:ARTICLES?|D[ÉE]SIGNATION)\s+(?:QT[ÉE]|QUANTIT[ÉE]).*(?:PU|PRIX).*(?:TVA|T\.V\.A\.).*(?:TOTAL|MONTANT)/i;
+const TOTAL_REGEX = /^(?:TOTAL\s+(?:HT|TTC)|NET\s+[ÀA]\s+PAYER|SOUS[- ]TOTAL)/i;
+const PAGE_NOISE_REGEX = /^(?:PAGE\s+\d+|DEVIS\s+(?:N[°O]|#)|[A-ZÀ-Ý][A-ZÀ-Ý\s-]{5,})$/;
+const NUMBERS_ONLY_REGEX = /^(\d+(?:[,.]\d+)?)\s+(\d[\d .,.]*)\s+(\d+(?:[,.]\d+)?)%?\s+(\d[\d .,.]*)$/;
+const INLINE_ITEM_REGEX = /^(.*\S)\s+(\d+(?:[,.]\d+)?)\s+(\d[\d .,.]*)\s+(\d+(?:[,.]\d+)?)%?\s+(\d[\d .,.]*)$/;
 
 export function buildLinesFromTextContent(textContent) {
-  const lines = [];
-  let currentParts = [];
-  let currentBaseline = null;
-
-  for (const item of textContent.items) {
-    if (!item.str) {
-      continue;
-    }
-
-    const text = item.str.replace(NBSP_REGEX, " ").replace(MULTISPACE_REGEX, " ").trim();
-    if (!text) {
-      continue;
-    }
-
-    const baseline = item.transform ? item.transform[5] : null;
-    const height = item.height || (item.transform ? Math.abs(item.transform[3]) : 0);
-    const tolerance = Math.max(2, (height || 9) * 0.6);
-
-    if (currentBaseline === null && baseline !== null) {
-      currentBaseline = baseline;
-    }
-
-    if (
-      currentParts.length > 0 &&
-      baseline !== null &&
-      currentBaseline !== null &&
-      Math.abs(baseline - currentBaseline) > tolerance
-    ) {
-      pushLine(lines, currentParts);
-      currentBaseline = baseline;
-    }
-
-    currentParts.push(text);
-
-    if (item.hasEOL) {
-      pushLine(lines, currentParts);
-      currentBaseline = null;
-    }
+  const groups = new Map();
+  for (const item of textContent.items || []) {
+    const text = String(item.str || "").replace(NBSP_REGEX, " ").replace(MULTISPACE_REGEX, " ").trim();
+    if (!text) continue;
+    const baseline = item.transform ? Math.round(item.transform[5] * 2) / 2 : groups.size;
+    const x = item.transform ? item.transform[4] : 0;
+    const group = groups.get(baseline) || [];
+    group.push({ text, x });
+    groups.set(baseline, group);
   }
-
-  pushLine(lines, currentParts);
-  return lines;
+  return [...groups.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([, parts]) => parts.sort((a, b) => a.x - b.x).map((part) => part.text).join(" ").replace(MULTISPACE_REGEX, " ").trim())
+    .filter(Boolean);
 }
 
-// --- CONSTANTES ET REGEX ---
-
-const HEADER_REGEX = /ARTICLES\s+QT[ÉE]\s+PU\s+TVA\s+TOTAL/i;
-const TOTAL_HT_REGEX = /TOTAL\s+HT/i;
-
-// On exige au moins deux nombres décimaux (PU et TOTAL)
-const QTY_LINE_INLINE = /^(.*\S)\s+(\d+)\s+(\d+[\d.,]*)\s+(\d+)%\s+(\d+[\d.,]*)\s*$/;
-const QTY_LINE_ALONE = /^(\d+)\s+(\d+[\d.,]*)\s+(\d+)%\s+(\d+[\d.,]*)\s*$/;
-
-// --- NORMALISATION DES LIGNES ---
-
-function normalizeLine(line) {
-  return line
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+function normalize(line) {
+  return line.replace(NBSP_REGEX, " ").replace(MULTISPACE_REGEX, " ").trim();
 }
 
-// Concatène proprement les fragments de description multi-lignes
-function joinDescriptionParts(parts) {
-  return parts
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .reduce((acc, cur) => {
-      if (!acc) return cur;
-      if (acc.endsWith("-")) {
-        return acc + " " + cur;
-      }
-      return acc + " " + cur;
-    }, "")
-    .replace(/\s+-\s+/g, " - ")
-    .trim();
+function toNumber(value) {
+  const compact = value.replace(/\s/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
+  return Number.parseFloat(compact);
 }
 
-// --- CREATION D'UN ARTICLE À PARTIR DES STRINGS ---
-
-function makeItem(description, qtyStr, puStr, tvaStr, totalStr) {
-  const toNumber = (s) =>
-    parseFloat(s.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
-
-  const qty = toNumber(qtyStr);
-  const unitPrice = toNumber(puStr);
-  const total = toNumber(totalStr);
-  const tva = parseFloat(tvaStr);
-
-  // Filtrage des cas aberrants
-  if (!description || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(total)) {
-    return null;
-  }
-
-  return { description, qty, unitPrice, tva, total };
+function joinDescription(parts) {
+  return parts.join(" ").replace(MULTISPACE_REGEX, " ").replace(/\s+-\s+/g, " - ").trim();
 }
 
-// --- PARSEUR PROFIL "AUDACE" ---
+function makeItem(description, qty, unitPrice, tva, total) {
+  const item = {
+    description: joinDescription(description.split("\n")),
+    qty: toNumber(qty),
+    unitPrice: toNumber(unitPrice),
+    tva: toNumber(tva),
+    total: toNumber(total),
+  };
+  return item.description && Number.isFinite(item.qty) && item.qty > 0 && Number.isFinite(item.total) ? item : null;
+}
 
-export function extractItemsFromAudaceQuote(lines) {
-  const normLines = lines.map(normalizeLine);
-  const headerIdx = normLines.findIndex((l) => HEADER_REGEX.test(l));
-  if (headerIdx === -1) return [];
-
+/**
+ * Parse a page while retaining the table state from preceding pages.
+ * This is vital for quotes whose table header appears only on page one.
+ */
+export function extractItemsFromQuotePage(lines, previous = {}) {
+  const context = {
+    tableActive: Boolean(previous.tableActive),
+    pendingDescription: Array.isArray(previous.pendingDescription) ? [...previous.pendingDescription] : [],
+  };
   const items = [];
-  let currentDescParts = [];
+  let headerFound = false;
 
-  for (let i = headerIdx + 1; i < normLines.length; i++) {
-    const line = normLines[i];
+  for (const rawLine of lines) {
+    const line = normalize(rawLine);
     if (!line) continue;
-
-    // Fin du tableau
-    if (TOTAL_HT_REGEX.test(line)) break;
-
-    // Cas description + quantités sur UNE ligne
-    let m = line.match(QTY_LINE_INLINE);
-    if (m) {
-      const [_, descTail, qtyStr, puStr, tvaStr, totalStr] = m;
-      const fullDesc = joinDescriptionParts([...currentDescParts, descTail]);
-      const item = makeItem(fullDesc, qtyStr, puStr, tvaStr, totalStr);
-      if (item) items.push(item);
-      currentDescParts = [];
+    if (HEADER_REGEX.test(line)) {
+      context.tableActive = true;
+      context.pendingDescription = [];
+      headerFound = true;
+      continue;
+    }
+    if (!context.tableActive) continue;
+    if (TOTAL_REGEX.test(line)) {
+      context.tableActive = false;
+      context.pendingDescription = [];
       continue;
     }
 
-    // Cas ligne quantités SEULE (description déjà accumulée)
-    m = line.match(QTY_LINE_ALONE);
-    if (m) {
-      const [_, qtyStr, puStr, tvaStr, totalStr] = m;
-      const fullDesc = joinDescriptionParts(currentDescParts);
-      const item = makeItem(fullDesc, qtyStr, puStr, tvaStr, totalStr);
+    const inline = line.match(INLINE_ITEM_REGEX);
+    const numeric = line.match(NUMBERS_ONLY_REGEX);
+    if (inline) {
+      const [, description, qty, unitPrice, tva, total] = inline;
+      const item = makeItem([...context.pendingDescription, description].join("\n"), qty, unitPrice, tva, total);
       if (item) items.push(item);
-      currentDescParts = [];
+      context.pendingDescription = [];
       continue;
     }
-
-    // Sinon : c'est une ligne de description
-    currentDescParts.push(line);
+    if (numeric && context.pendingDescription.length) {
+      const [, qty, unitPrice, tva, total] = numeric;
+      const item = makeItem(context.pendingDescription.join("\n"), qty, unitPrice, tva, total);
+      if (item) items.push(item);
+      context.pendingDescription = [];
+      continue;
+    }
+    if (!PAGE_NOISE_REGEX.test(line)) context.pendingDescription.push(line);
   }
-
-  return items;
-}
-
-// --- POINT D'ENTRÉE GÉNÉRIQUE POUR L'ANALYSE ---
-
-export function extractItemsFromLines(lines) {
-  // Profil principal : Audace
-  const itemsAudace = extractItemsFromAudaceQuote(lines);
-  if (itemsAudace.length > 0) return itemsAudace;
-
-  // Plus tard : essayer d'autres parseurs (autres fournisseurs)
-  // const itemsAutre = extractItemsFromAutreFournisseur(lines);
-  // if (itemsAutre.length > 0) return itemsAutre;
-
-  return [];
+  return { items, context, headerFound };
 }
