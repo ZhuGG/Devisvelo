@@ -1,213 +1,38 @@
-const elements = {
-  dropZone: document.getElementById("dropZone"),
-  browseButton: document.getElementById("browseButton"),
-  fileInput: document.getElementById("fileInput"),
-  previewCanvas: document.getElementById("previewCanvas"),
-  exportButton: document.getElementById("exportButton"),
-  statsRow: document.getElementById("statsRow"),
-  statPages: document.getElementById("statPages"),
-  statRows: document.getElementById("statRows"),
-  statItems: document.getElementById("statItems"),
-  statsNote: document.getElementById("statsNote"),
-  emptyState: document.getElementById("emptyState"),
-  resultsState: document.getElementById("resultsState"),
-  resultsContext: document.getElementById("resultsContext"),
-  resultsWrapper: document.getElementById("resultsWrapper"),
-  resultsBody: document.getElementById("resultsBody"),
-  dropStatus: document.getElementById("dropStatus"),
-  toastEl: document.getElementById("toast"),
-};
+import { filterAndSortInventory } from "./inventory-controls.js";
 
-export { elements };
+export const elements = Object.fromEntries(["dropZone", "browseButton", "fileInput", "resetButton", "fileCard", "fileName", "fileMeta", "previewCanvas", "previewFrame", "exportButton", "copyButton", "statsRow", "statPages", "statRows", "statItems", "inventoryControls", "inventorySearch", "inventorySort", "visibleCount", "diagnostics", "emptyState", "resultsState", "resultsBody", "dropStatus", "toast"].map((id) => [id, document.getElementById(id)]));
 
-const STATUS_ICONS = {
-  info: "ℹ️",
-  error: "⚠️",
-  success: "✅",
-};
+let inventoryEntries = [];
 
-const ANALYSIS_STATES = ["idle", "loading", "success", "error"];
-const EMPTY_STATS_NOTE = "Aucun article trouvé.";
+export function showToast(message, isError = false) { const { toast } = elements; toast.textContent = message; toast.style.background = isError ? "#a83223" : "#11251f"; toast.classList.add("show"); window.clearTimeout(showToast.timer); showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 3500); }
+export function showStatus(message = "", type = "") { const { dropStatus } = elements; dropStatus.textContent = message; dropStatus.className = `status ${type}`; }
+export function setAnalysisState(state) { elements.dropZone.classList.toggle("is-loading", state === "loading"); elements.browseButton.disabled = state === "loading"; }
+export function showFile(file) { elements.fileCard.hidden = false; elements.fileName.textContent = file.name; elements.fileMeta.textContent = `${(file.size / 1024 / 1024).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Mo · PDF`; }
+export function resetUi() { inventoryEntries = []; elements.statsRow.hidden = true; elements.inventoryControls.hidden = true; elements.inventorySearch.value = ""; elements.inventorySort.value = "source"; elements.visibleCount.textContent = ""; elements.diagnostics.hidden = true; elements.emptyState.hidden = false; elements.resultsState.hidden = true; elements.resultsBody.innerHTML = ""; elements.exportButton.disabled = true; elements.copyButton.disabled = true; elements.previewFrame.hidden = true; elements.previewCanvas.width = 0; elements.previewCanvas.height = 0; }
 
-export function showToast(message, isError = false) {
-  const { toastEl } = elements;
-  toastEl.textContent = message;
-  toastEl.classList.toggle("toast-danger", isError);
-  toastEl.classList.add("show");
-  window.setTimeout(() => {
-    toastEl.classList.remove("show");
-  }, 2800);
-}
-
-export function showStatus(type, message) {
-  const { dropStatus } = elements;
-  if (!type || !message) {
-    dropStatus.textContent = "";
-    dropStatus.className = "drop-status";
-    dropStatus.setAttribute("aria-hidden", "true");
-    return;
-  }
-
-  const icon = STATUS_ICONS[type] || STATUS_ICONS.info;
-  dropStatus.innerHTML = `
-    <span class="status-icon" aria-hidden="true">${icon}</span>
-    <span>${message}</span>
-  `;
-  dropStatus.className = `drop-status status--${type}`;
-  dropStatus.removeAttribute("aria-hidden");
-}
-
-export function setAnalysisState(state) {
-  const { dropZone, browseButton } = elements;
-  const normalizedState = ANALYSIS_STATES.includes(state) ? state : "idle";
-  ANALYSIS_STATES.forEach((key) => {
-    document.body.classList.toggle(`analysis-${key}`, key === normalizedState);
-  });
-  dropZone.classList.toggle("is-loading", normalizedState === "loading");
-  dropZone.setAttribute("aria-busy", normalizedState === "loading" ? "true" : "false");
-  browseButton.disabled = normalizedState === "loading";
-}
-
-export function resetUi() {
-  const {
-    statPages,
-    statRows,
-    statItems,
-    statsRow,
-    statsNote,
-    emptyState,
-    resultsState,
-    resultsContext,
-    resultsWrapper,
-    resultsBody,
-    exportButton,
-    previewCanvas,
-  } = elements;
-
-  document.body.classList.remove("has-results");
-  statPages.textContent = "0";
-  statRows.textContent = "0";
-  statItems.textContent = "0";
-  statsRow.style.display = "none";
-  statsNote.classList.remove("is-visible");
-  statsNote.textContent = EMPTY_STATS_NOTE;
-  emptyState.style.display = "flex";
-  resultsState.style.display = "none";
-  resultsState.classList.remove("is-visible");
-  resultsContext.style.display = "none";
-  resultsWrapper.style.display = "none";
-  resultsBody.innerHTML = "";
-  exportButton.disabled = true;
-
-  const ctx = previewCanvas.getContext("2d");
-  ctx.clearRect(0, 0, previewCanvas.width || 0, previewCanvas.height || 0);
-  previewCanvas.width = 0;
-  previewCanvas.height = 0;
-  previewCanvas.style.height = "";
-  previewCanvas.style.width = "";
-}
-
-export function renderStats({ pagesAnalyzed = 0, totalRows = 0, uniqueArticles = 0 }) {
-  const { statsRow, statPages, statRows, statItems, statsNote } = elements;
-  if (!pagesAnalyzed) {
-    statsRow.style.display = "none";
-    statsNote.classList.remove("is-visible");
-    statsNote.textContent = EMPTY_STATS_NOTE;
-    return;
-  }
-  statsRow.style.display = "flex";
-  statPages.textContent = String(pagesAnalyzed);
-  statRows.textContent = String(totalRows);
-  statItems.textContent = String(uniqueArticles);
-
-  if (uniqueArticles === 0) {
-    statsNote.textContent = EMPTY_STATS_NOTE;
-    statsNote.classList.add("is-visible");
-  } else {
-    statsNote.textContent = "";
-    statsNote.classList.remove("is-visible");
-  }
+export function renderStats({ pagesAnalyzed, totalRows, uniqueArticles, pages }) {
+  elements.statsRow.hidden = false; elements.statPages.textContent = pagesAnalyzed; elements.statRows.textContent = totalRows; elements.statItems.textContent = uniqueArticles;
+  const emptyPages = pages.filter((page) => page.lines && !page.found).map((page) => page.pageNumber);
+  elements.diagnostics.hidden = false;
+  if (emptyPages.length) { elements.diagnostics.className = "diagnostics warn"; elements.diagnostics.textContent = `Contrôle conseillé : aucune ligne retenue sur la page ${emptyPages.join(", ")}. Les autres pages ont bien été lues dans la même continuité de tableau.`; }
+  else { elements.diagnostics.className = "diagnostics"; elements.diagnostics.textContent = `Lecture continue confirmée sur ${pagesAnalyzed} page${pagesAnalyzed > 1 ? "s" : ""} : ${totalRows} ligne${totalRows > 1 ? "s" : ""} ont été rattachées au devis.`; }
 }
 
 export function renderResults(aggregated) {
-  const {
-    emptyState,
-    resultsWrapper,
-    resultsState,
-    resultsContext,
-    resultsBody,
-    exportButton,
-  } = elements;
-  const hasResults = Boolean(aggregated && aggregated.size > 0);
-
-  document.body.classList.toggle("has-results", hasResults);
-
-  if (!hasResults) {
-    emptyState.style.display = "flex";
-    resultsState.style.display = "none";
-    resultsState.classList.remove("is-visible");
-    resultsContext.style.display = "none";
-    resultsWrapper.style.display = "none";
-    resultsBody.innerHTML = "";
-    exportButton.disabled = true;
-    return;
-  }
-
-  emptyState.style.display = "none";
-  resultsState.style.display = "flex";
-  resultsState.classList.add("is-visible");
-  resultsContext.style.display = "flex";
-  resultsWrapper.style.display = "block";
-  exportButton.disabled = false;
-
-  const entries = Array.from(aggregated.entries()).sort((a, b) => {
-    if (b[1] !== a[1]) {
-      return b[1] - a[1];
-    }
-    return a[0].localeCompare(b[0], "fr");
-  });
-
-  resultsBody.innerHTML = "";
-  for (const [article, qty] of entries) {
-    const tr = document.createElement("tr");
-    const tdName = document.createElement("td");
-    const tdQty = document.createElement("td");
-    tdName.textContent = article;
-    tdQty.textContent = qty.toLocaleString("fr-FR");
-    tdQty.className = "qty-cell";
-    tr.appendChild(tdName);
-    tr.appendChild(tdQty);
-    resultsBody.appendChild(tr);
-  }
+  inventoryEntries = [...(aggregated?.values() || [])].map((item, index) => ({ item, index }));
+  const hasResults = inventoryEntries.length > 0; elements.inventoryControls.hidden = !hasResults; elements.exportButton.disabled = !hasResults; elements.copyButton.disabled = !hasResults;
+  updateInventoryView();
 }
 
-export async function renderPreview(pdf) {
-  const { previewCanvas } = elements;
-  const ctx = previewCanvas.getContext("2d");
-  ctx.clearRect(0, 0, previewCanvas.width || 0, previewCanvas.height || 0);
-
-  if (!pdf || pdf.numPages === 0) {
-    return;
-  }
-
-  try {
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 1.2 });
-    const ratio = window.devicePixelRatio || 1;
-    previewCanvas.width = viewport.width * ratio;
-    previewCanvas.height = viewport.height * ratio;
-    previewCanvas.style.height = "260px";
-    previewCanvas.style.width = "100%";
-
-    const scale = (previewCanvas.height / ratio) / viewport.height;
-    const scaledViewport = page.getViewport({ scale });
-    const renderContext = {
-      canvasContext: ctx,
-      viewport: scaledViewport,
-    };
-
-    await page.render(renderContext).promise;
-  } catch (error) {
-    console.error(error);
-  }
+export function updateInventoryView() {
+  const visibleEntries = filterAndSortInventory(inventoryEntries, elements.inventorySearch.value, elements.inventorySort.value);
+  const hasResults = inventoryEntries.length > 0; const hasVisibleEntries = visibleEntries.length > 0;
+  elements.resultsState.hidden = !hasVisibleEntries; elements.emptyState.hidden = hasVisibleEntries;
+  elements.emptyState.classList.toggle("is-filter-empty", hasResults && !hasVisibleEntries);
+  if (hasResults && !hasVisibleEntries) { elements.emptyState.querySelector("h3").textContent = "Aucune pièce ne correspond à cette recherche."; elements.emptyState.querySelector("p").textContent = "Modifiez ou effacez le filtre pour retrouver l’inventaire complet."; }
+  else if (!hasResults) { elements.emptyState.querySelector("h3").textContent = "Votre inventaire apparaîtra ici."; elements.emptyState.querySelector("p").textContent = "Le contrôle de lecture vous indique aussi les pages qui demandent votre attention."; }
+  elements.visibleCount.textContent = elements.inventorySearch.value.trim() ? `${visibleEntries.length} / ${inventoryEntries.length} référence${visibleEntries.length > 1 ? "s" : ""} visible${visibleEntries.length > 1 ? "s" : ""}` : `${inventoryEntries.length} référence${inventoryEntries.length > 1 ? "s" : ""}`;
+  elements.resultsBody.innerHTML = "";
+  visibleEntries.forEach(({ item }) => { const tr = document.createElement("tr"); tr.innerHTML = `<td></td><td>${item.qty.toLocaleString("fr-FR")}</td><td><span class="page-tag">${item.pages.map((page) => `p.${page}`).join(" · ")}</span></td>`; tr.firstElementChild.textContent = item.description; elements.resultsBody.appendChild(tr); });
 }
+export async function renderPreview(pdf) { try { const page = await pdf.getPage(1); const viewport = page.getViewport({ scale: 1 }); const canvas = elements.previewCanvas; const ratio = window.devicePixelRatio || 1; canvas.width = viewport.width * ratio; canvas.height = viewport.height * ratio; await page.render({ canvasContext: canvas.getContext("2d"), viewport: page.getViewport({ scale: ratio }) }).promise; elements.previewFrame.hidden = false; } catch { elements.previewFrame.hidden = true; } }

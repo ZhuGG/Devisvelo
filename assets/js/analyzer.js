@@ -1,111 +1,49 @@
-import { buildLinesFromTextContent, extractItemsFromLines } from "./pdf-parser.js";
+import { buildLinesFromTextContent, extractItemsFromQuotePage } from "./pdf-parser.js";
 import { renderPreview, renderResults, renderStats, resetUi, showToast } from "./ui.js";
 
-const state = {
-  aggregated: new Map(),
-  totalRows: 0,
-  pagesAnalyzed: 0,
-  hasReadableText: false,
-};
-
+const state = { aggregated: new Map(), pages: [], totalRows: 0, pagesAnalyzed: 0, hasReadableText: false };
 let pdfjsLib;
 
-export function initializeAnalyzer(pdfLib) {
-  pdfjsLib = pdfLib;
-}
-
-export function resetAnalysis() {
-  state.aggregated.clear();
-  state.totalRows = 0;
-  state.pagesAnalyzed = 0;
-  state.hasReadableText = false;
-  resetUi();
-}
+export function initializeAnalyzer(pdfLib) { pdfjsLib = pdfLib; }
+export function resetAnalysis() { state.aggregated.clear(); state.pages = []; state.totalRows = 0; state.pagesAnalyzed = 0; state.hasReadableText = false; resetUi(); }
 
 export async function analyzePdf(arrayBuffer) {
-  if (!pdfjsLib) {
-    throw new Error("La librairie PDF.js n'est pas initialisée.");
-  }
-
+  if (!pdfjsLib) throw new Error("La bibliothèque PDF n’est pas initialisée.");
   resetAnalysis();
-
-  const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-  const pdf = await loadingTask.promise;
-
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   state.pagesAnalyzed = pdf.numPages;
-
   await renderPreview(pdf);
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-    const page = await pdf.getPage(pageNum);
+  let parserContext = {};
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
     const textContent = await page.getTextContent();
-    if (textContent?.items?.length) {
-      state.hasReadableText = true;
-    }
     const lines = buildLinesFromTextContent(textContent);
-    if (lines.length > 0) {
-      state.hasReadableText = true;
-    }
-
-    if (window.DEBUG_PDF) {
-      console.group("LIGNES PDF");
-      lines.forEach((l, idx) => console.log(idx, JSON.stringify(l)));
-      console.groupEnd();
-    }
-
-    const items = extractItemsFromLines(lines);
-
-    if (window.DEBUG_PDF) {
-      console.group("ARTICLES PARSÉS");
-      console.table(items);
-      console.groupEnd();
-    }
-
-    state.totalRows += items.length;
-
-    for (const item of items) {
-      const previousValue = state.aggregated.get(item.description) || 0;
-      state.aggregated.set(item.description, previousValue + item.qty);
-    }
+    state.hasReadableText ||= lines.length > 0;
+    const parsed = extractItemsFromQuotePage(lines, parserContext);
+    parserContext = parsed.context;
+    state.pages.push({ pageNumber, lines: lines.length, found: parsed.items.length, headerFound: parsed.headerFound });
+    state.totalRows += parsed.items.length;
+    parsed.items.forEach((item) => {
+      const key = item.description.toLocaleLowerCase("fr");
+      const current = state.aggregated.get(key) || { ...item, pages: [] };
+      current.qty += state.aggregated.has(key) ? item.qty : 0;
+      current.pages = [...new Set([...current.pages, pageNumber])];
+      state.aggregated.set(key, current);
+    });
   }
-
-  renderStats({
-    pagesAnalyzed: state.pagesAnalyzed,
-    totalRows: state.totalRows,
-    uniqueArticles: state.aggregated.size,
-  });
+  renderStats({ pagesAnalyzed: state.pagesAnalyzed, totalRows: state.totalRows, uniqueArticles: state.aggregated.size, pages: state.pages });
   renderResults(state.aggregated);
-
-  if (state.aggregated.size === 0) {
-    showToast("Aucune ligne d’articles détectée. Vérifie le format du devis.", true);
-  } else {
-    showToast("Analyse PDF terminée.");
-  }
-
-  return {
-    pagesAnalyzed: state.pagesAnalyzed,
-    totalRows: state.totalRows,
-    aggregated: new Map(state.aggregated),
-    hasReadableText: state.hasReadableText,
-  };
+  showToast(state.aggregated.size ? "Analyse terminée : inventaire prêt à contrôler." : "Aucune ligne d’article n’a été détectée.", !state.aggregated.size);
+  return { ...state, aggregated: new Map(state.aggregated) };
 }
 
 export function buildCsvContent() {
-  if (state.aggregated.size === 0) {
-    return null;
-  }
-
-  const entries = Array.from(state.aggregated.entries()).sort((a, b) => {
-    if (b[1] !== a[1]) {
-      return b[1] - a[1];
-    }
-    return a[0].localeCompare(b[0], "fr");
-  });
-
-  const lines = ["designation,quantite_totale"];
-  for (const [article, qty] of entries) {
-    const safeArticle = '"' + article.replace(/"/g, '""') + '"';
-    lines.push(`${safeArticle},${qty.toString().replace(".", ",")}`);
-  }
+  if (!state.aggregated.size) return null;
+  const lines = ["designation,quantite_totale,pages_source"];
+  [...state.aggregated.values()].sort((a,b) => a.description.localeCompare(b.description, "fr")).forEach((item) => lines.push(`"${item.description.replace(/"/g, '""')}",${String(item.qty).replace(".", ",")},"${item.pages.join(" · ")}"`));
   return lines.join("\n");
+}
+
+export function buildClipboardContent() {
+  return [...state.aggregated.values()].sort((a,b) => a.description.localeCompare(b.description, "fr")).map((item) => `${item.description}\t${item.qty}\t${item.pages.join(", ")}`).join("\n");
 }
